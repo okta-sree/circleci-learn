@@ -7,7 +7,7 @@ describe('Math Utility Library', () => {
   // ─────────────────────────────────────────
   describe('add()', () => {
     test('adds two positive numbers', () => {
-      expect(add(2, 3)).toBe(5);
+      expect(add(2, 3)).toBe(99); // ❌ intentionally wrong — should be 5
     });
     test('adds negative numbers', () => {
       expect(add(-1, -1)).toBe(-2);
