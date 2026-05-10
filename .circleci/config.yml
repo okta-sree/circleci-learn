@@ -253,9 +253,29 @@ jobs:
             echo "  3. Project variables    (project secrets)"
             echo "  4. Inline variables     (in config.yml)"
             echo "  5. Built-in variables   (always available)"
+
+      # ───────────────────────────────────────────────────────
+      # SECURITY & MASKING DEMO
+      # This shows how CircleCI protects your secrets.
+      # ───────────────────────────────────────────────────────
+      - run:
+          name: "Security — Masking vs. Bypassing"
+          command: |
+            echo "═══════════════════════════════════════"
+            echo "  SECURITY & MASKING DEMO"
+            echo "═══════════════════════════════════════"
             echo ""
-            echo "  If the same key exists in multiple places,"
-            echo "  the HIGHER precedence wins."
+            echo "1. Attempting to print a secret directly (Masked):"
+            echo "   VALUE: $DEPLOY_API_KEY"
+            echo ""
+            echo "2. Attempting to print a context secret (Masked):"
+            echo "   VALUE: $SHARED_SLACK_WEBHOOK"
+            echo ""
+            echo "3. Bypassing masking using Base64 (Visible):"
+            echo "   ENCODED: $(echo $DEPLOY_API_KEY | base64)"
+            echo ""
+            echo "💡 This encoded value can be decoded locally using: echo 'VALUE' | base64 --decode"
+
 
   # ── JOB: Deploy ──
   deploy:
