@@ -1,22 +1,34 @@
 version: 2.1
 
 # ═══════════════════════════════════════════════════════════════════
-#  CircleCI Learning Project — Math Utility Library
-#  
-#  Pipeline structure:
-#    [install] ──► [lint]  ─┐
-#                            ├──► [deploy] (main branch only)
-#    [install] ──► [test]  ─┘
+#  CircleCI Learning Project — Variables & Contexts Deep Dive
 #
-#  Jobs run in isolated Docker containers.
-#  Files are shared between jobs using "workspaces".
+#  5 Stages of Environment Variables:
+#    Stage 1 → Built-in variables  (CircleCI provides automatically)
+#    Stage 2 → Inline variables    (hardcoded in config.yml)
+#    Stage 3 → Project variables   (set in CircleCI UI → Project Settings)
+#    Stage 4 → Context variables   (org-level shared secrets)
+#    Stage 5 → Pipeline parameters (passed dynamically at trigger time)
 # ═══════════════════════════════════════════════════════════════════
 
 orbs:
   node: circleci/node@5.1.0
 
 # ───────────────────────────────────────────
-# EXECUTORS — reusable execution environment
+# STAGE 5: PIPELINE PARAMETERS
+# These are values you can pass when triggering a pipeline via API.
+# They have defaults so the pipeline works normally on git push too.
+# ───────────────────────────────────────────
+parameters:
+  deploy-environment:
+    type: string
+    default: "staging"          # Default when triggered by git push
+  run-integration-tests:
+    type: boolean
+    default: false              # Flip to true via API to run extra tests
+
+# ───────────────────────────────────────────
+# EXECUTORS
 # ───────────────────────────────────────────
 executors:
   node-executor:
@@ -29,7 +41,7 @@ executors:
 # ───────────────────────────────────────────
 jobs:
 
-  # ── JOB 1: Install dependencies and cache them ──
+  # ── JOB: Install dependencies ──
   install:
     executor: node-executor
     steps:
@@ -54,7 +66,7 @@ jobs:
             - package.json
             - .eslintrc.js
 
-  # ── JOB 2: Lint the code ──
+  # ── JOB: Lint ──
   lint:
     executor: node-executor
     steps:
@@ -65,7 +77,7 @@ jobs:
           name: Run ESLint
           command: npm run lint
 
-  # ── JOB 3: Run tests and store results ──
+  # ── JOB: Tests ──
   test:
     executor: node-executor
     environment:
@@ -84,7 +96,168 @@ jobs:
           path: test-results/
           destination: test-results
 
-  # ── JOB 4: Simulate deploy (only on main branch) ──
+  # ══════════════════════════════════════════════════════════════
+  # ── DEMO JOB: Environment Variables — All 5 Stages ──
+  # This job exists purely to teach. It prints every kind of
+  # variable so you can see them in the CircleCI job logs.
+  # ══════════════════════════════════════════════════════════════
+  env-demo:
+    executor: node-executor
+
+    # ─────────────────────────────────────────────────────────
+    # STAGE 2: INLINE VARIABLES
+    # Defined directly in config.yml. Safe for non-secrets.
+    # ❌ NEVER put passwords/tokens here — it's in your git repo!
+    # ─────────────────────────────────────────────────────────
+    environment:
+      APP_NAME: "circleci-learn"          # Hardcoded — anyone with repo access sees this
+      LOG_LEVEL: "info"                   # Fine for non-sensitive config
+      NODE_ENV: "ci"                      # Tells app code it's running in CI
+
+    steps:
+      - checkout
+
+      # ───────────────────────────────────────────────────────
+      # STAGE 1: BUILT-IN VARIABLES
+      # CircleCI automatically injects these into every job.
+      # No configuration needed — they're always available.
+      # ───────────────────────────────────────────────────────
+      - run:
+          name: "Stage 1 — Built-in Variables (auto-injected by CircleCI)"
+          command: |
+            echo "═══════════════════════════════════════"
+            echo "  STAGE 1: BUILT-IN VARIABLES"
+            echo "═══════════════════════════════════════"
+            echo ""
+            echo "🔢 Build Info:"
+            echo "  CIRCLE_BUILD_NUM    = $CIRCLE_BUILD_NUM"
+            echo "  CIRCLE_BUILD_URL    = $CIRCLE_BUILD_URL"
+            echo "  CIRCLE_JOB          = $CIRCLE_JOB"
+            echo "  CIRCLE_WORKFLOW_ID  = $CIRCLE_WORKFLOW_ID"
+            echo "  CIRCLE_PIPELINE_ID  = $CIRCLE_PIPELINE_ID"
+            echo ""
+            echo "🌿 Git Info:"
+            echo "  CIRCLE_BRANCH       = $CIRCLE_BRANCH"
+            echo "  CIRCLE_SHA1         = $CIRCLE_SHA1"
+            echo "  CIRCLE_TAG          = ${CIRCLE_TAG:-<no tag>}"
+            echo "  CIRCLE_PROJECT_REPONAME = $CIRCLE_PROJECT_REPONAME"
+            echo ""
+            echo "👤 User Info:"
+            echo "  CIRCLE_USERNAME     = $CIRCLE_USERNAME"
+            echo "  CIRCLE_PROJECT_USERNAME = $CIRCLE_PROJECT_USERNAME"
+            echo ""
+            echo "📁 Environment:"
+            echo "  HOME                = $HOME"
+            echo "  CI                  = $CI"
+            echo "  CIRCLECI            = $CIRCLECI"
+
+      # ───────────────────────────────────────────────────────
+      # STAGE 2: INLINE VARIABLES (defined in 'environment' block above)
+      # ───────────────────────────────────────────────────────
+      - run:
+          name: "Stage 2 — Inline Variables (hardcoded in config.yml)"
+          command: |
+            echo "═══════════════════════════════════════"
+            echo "  STAGE 2: INLINE VARIABLES"
+            echo "═══════════════════════════════════════"
+            echo ""
+            echo "  APP_NAME   = $APP_NAME"
+            echo "  LOG_LEVEL  = $LOG_LEVEL"
+            echo "  NODE_ENV   = $NODE_ENV"
+            echo ""
+            echo "  ✅ Good for: app names, log levels, non-sensitive config"
+            echo "  ❌ Bad for:  passwords, API keys, tokens (visible in git!)"
+
+      # ───────────────────────────────────────────────────────
+      # STAGE 3: PROJECT VARIABLES (set in CircleCI UI)
+      # Go to: Project Settings → Environment Variables → Add
+      # They are encrypted at rest and NOT visible after saving.
+      # We expect: DEPLOY_API_KEY and APP_VERSION to be set in UI.
+      # ───────────────────────────────────────────────────────
+      - run:
+          name: "Stage 3 — Project Variables (set in CircleCI Project Settings)"
+          command: |
+            echo "═══════════════════════════════════════"
+            echo "  STAGE 3: PROJECT VARIABLES"
+            echo "═══════════════════════════════════════"
+            echo ""
+            if [ -n "$DEPLOY_API_KEY" ]; then
+              echo "  DEPLOY_API_KEY = [SET ✅ — value hidden for security]"
+              # Safe way to verify a secret exists without printing it:
+              echo "  Key length: ${#DEPLOY_API_KEY} characters"
+            else
+              echo "  DEPLOY_API_KEY = [NOT SET ⚠️ — go to Project Settings to add it]"
+            fi
+            echo ""
+            if [ -n "$APP_VERSION" ]; then
+              echo "  APP_VERSION = $APP_VERSION"
+            else
+              echo "  APP_VERSION = [NOT SET ⚠️]"
+            fi
+            echo ""
+            echo "  Set these at: Project Settings → Environment Variables"
+
+      # ───────────────────────────────────────────────────────
+      # STAGE 4: CONTEXT VARIABLES (org-level, shared secrets)
+      # Set in: Organization Settings → Contexts → Create Context
+      # Then reference in workflow with: context: [context-name]
+      # We expect: SHARED_SLACK_WEBHOOK from a "team-notifications" context
+      # ───────────────────────────────────────────────────────
+      - run:
+          name: "Stage 4 — Context Variables (org-level shared secrets)"
+          command: |
+            echo "═══════════════════════════════════════"
+            echo "  STAGE 4: CONTEXT VARIABLES"
+            echo "═══════════════════════════════════════"
+            echo ""
+            if [ -n "$SHARED_SLACK_WEBHOOK" ]; then
+              echo "  SHARED_SLACK_WEBHOOK = [SET ✅ — injected from context]"
+            else
+              echo "  SHARED_SLACK_WEBHOOK = [NOT SET ⚠️]"
+              echo "  → Create context 'team-notifications' in Org Settings"
+              echo "  → Add SHARED_SLACK_WEBHOOK there"
+              echo "  → Reference it in workflow: context: [team-notifications]"
+            fi
+
+      # ───────────────────────────────────────────────────────
+      # STAGE 5: PIPELINE PARAMETERS
+      # These are declared at the top of config.yml under 'parameters:'
+      # They have defaults but can be overridden via the CircleCI API.
+      # ───────────────────────────────────────────────────────
+      - run:
+          name: "Stage 5 — Pipeline Parameters (dynamic trigger values)"
+          command: |
+            echo "═══════════════════════════════════════"
+            echo "  STAGE 5: PIPELINE PARAMETERS"
+            echo "═══════════════════════════════════════"
+            echo ""
+            echo "  deploy-environment        = << pipeline.parameters.deploy-environment >>"
+            echo "  run-integration-tests     = << pipeline.parameters.run-integration-tests >>"
+            echo ""
+            echo "  These come from the 'parameters:' block at the top of config.yml"
+            echo "  Override via API:  POST /api/v2/project/{slug}/pipeline"
+            echo "  with body: { parameters: { deploy-environment: 'production' } }"
+
+      # ───────────────────────────────────────────────────────
+      # BONUS: Variable precedence & override demo
+      # ───────────────────────────────────────────────────────
+      - run:
+          name: "Bonus — Variable Precedence Order"
+          command: |
+            echo "═══════════════════════════════════════"
+            echo "  VARIABLE PRECEDENCE (highest → lowest)"
+            echo "═══════════════════════════════════════"
+            echo ""
+            echo "  1. Pipeline parameters  (dynamic, per-run)"
+            echo "  2. Context variables    (org-level secrets)"
+            echo "  3. Project variables    (project secrets)"
+            echo "  4. Inline variables     (in config.yml)"
+            echo "  5. Built-in variables   (always available)"
+            echo ""
+            echo "  If the same key exists in multiple places,"
+            echo "  the HIGHER precedence wins."
+
+  # ── JOB: Deploy ──
   deploy:
     executor: node-executor
     steps:
@@ -94,23 +267,22 @@ jobs:
       - run:
           name: Simulate Deployment
           command: |
-            echo "🚀 Deploying version $(node -e "console.log(require('./package.json').version)") to production..."
+            echo "🚀 Deploying to: << pipeline.parameters.deploy-environment >>"
             echo "📦 Package: $(node -e "console.log(require('./package.json').name)")"
+            echo "🔖 Version: $(node -e "console.log(require('./package.json').version)")"
             echo "✅ Deployment complete!"
       - run:
           name: Notify team
-          command: echo "📣 Deployment notification sent to team!"
+          command: echo "📣 Deployment notification sent!"
 
 # ───────────────────────────────────────────
-# WORKFLOWS — define job order and conditions
+# WORKFLOWS
 # ───────────────────────────────────────────
 workflows:
   build-lint-test-deploy:
     jobs:
-      # Step 1: Install (runs first, always)
       - install
 
-      # Step 2: Lint & Test run IN PARALLEL (both depend on install)
       - lint:
           requires:
             - install
@@ -119,22 +291,31 @@ workflows:
           requires:
             - install
 
-      # Step 3: ⏸️ APPROVAL GATE — a human must click "Approve" in CircleCI UI
-      #         The pipeline pauses here and waits. Deploy won't run until approved.
+      # env-demo runs in parallel with lint and test (no shared state needed)
+      # It references a context to get Stage 4 variables injected
+      - env-demo:
+          requires:
+            - install
+          # ────────────────────────────────────────────────────────
+          # STAGE 4: Reference a context here to inject its variables
+          # The context must exist in your org settings first.
+          # ────────────────────────────────────────────────────────
+          context:
+            - team-notifications    # ← org-level context we just created
+
       - hold-for-approval:
-          type: approval          # ← magic keyword: creates a manual gate
+          type: approval
           requires:
             - lint
             - test
+            - env-demo
           filters:
             branches:
               only: main
 
-      # Step 4: Deploy — only runs after manual approval, only on main
       - deploy:
           requires:
             - hold-for-approval
           filters:
             branches:
               only: main
-
