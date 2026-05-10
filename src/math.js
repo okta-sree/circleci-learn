@@ -69,4 +69,13 @@ function isPrime(n) {
   return true;
 }
 
-module.exports = { add, subtract, multiply, divide, factorial, isPrime };
+/**
+ * Returns the square of a number
+ * @param {number} n
+ * @returns {number}
+ */
+function square(n) {
+  return n * n;
+}
+
+module.exports = { add, subtract, multiply, divide, factorial, isPrime, square };

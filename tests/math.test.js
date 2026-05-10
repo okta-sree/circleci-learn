@@ -1,4 +1,4 @@
-const { add, subtract, multiply, divide, factorial, isPrime } = require('../src/math');
+const { add, subtract, multiply, divide, factorial, isPrime, square } = require('../src/math');
 
 describe('Math Utility Library', () => {
 
@@ -7,7 +7,7 @@ describe('Math Utility Library', () => {
   // ─────────────────────────────────────────
   describe('add()', () => {
     test('adds two positive numbers', () => {
-      expect(add(2, 3)).toBe(99); // ❌ intentionally wrong — should be 5
+      expect(add(2, 3)).toBe(5); // ✅ fixed
     });
     test('adds negative numbers', () => {
       expect(add(-1, -1)).toBe(-2);
@@ -83,6 +83,21 @@ describe('Math Utility Library', () => {
     });
     test('9 is not prime', () => {
       expect(isPrime(9)).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────
+  // SQUARE (new feature — added on feature branch)
+  // ─────────────────────────────────────────
+  describe('square()', () => {
+    test('square of 4 is 16', () => {
+      expect(square(4)).toBe(16);
+    });
+    test('square of 0 is 0', () => {
+      expect(square(0)).toBe(0);
+    });
+    test('square of negative number is positive', () => {
+      expect(square(-3)).toBe(9);
     });
   });
 
