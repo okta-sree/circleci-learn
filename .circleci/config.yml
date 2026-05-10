@@ -119,11 +119,22 @@ workflows:
           requires:
             - install
 
-      # Step 3: Deploy (only after both lint AND test pass, only on main)
-      - deploy:
+      # Step 3: ⏸️ APPROVAL GATE — a human must click "Approve" in CircleCI UI
+      #         The pipeline pauses here and waits. Deploy won't run until approved.
+      - hold-for-approval:
+          type: approval          # ← magic keyword: creates a manual gate
           requires:
             - lint
             - test
           filters:
             branches:
               only: main
+
+      # Step 4: Deploy — only runs after manual approval, only on main
+      - deploy:
+          requires:
+            - hold-for-approval
+          filters:
+            branches:
+              only: main
+
