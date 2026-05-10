@@ -1,0 +1,129 @@
+version: 2.1
+
+# ═══════════════════════════════════════════════════════════════════
+#  CircleCI Learning Project — Math Utility Library
+#  
+#  Pipeline structure:
+#    [install] ──► [lint]  ─┐
+#                            ├──► [deploy] (main branch only)
+#    [install] ──► [test]  ─┘
+#
+#  Jobs run in isolated Docker containers.
+#  Files are shared between jobs using "workspaces".
+# ═══════════════════════════════════════════════════════════════════
+
+orbs:
+  node: circleci/node@5.1.0
+
+# ───────────────────────────────────────────
+# EXECUTORS — reusable execution environment
+# ───────────────────────────────────────────
+executors:
+  node-executor:
+    docker:
+      - image: cimg/node:20.10
+    resource_class: medium
+
+# ───────────────────────────────────────────
+# JOBS
+# ───────────────────────────────────────────
+jobs:
+
+  # ── JOB 1: Install dependencies and cache them ──
+  install:
+    executor: node-executor
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - npm-deps-v1-{{ checksum "package-lock.json" }}
+            - npm-deps-v1-
+      - run:
+          name: Install npm dependencies
+          command: npm ci
+      - save_cache:
+          key: npm-deps-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - node_modules
+      - persist_to_workspace:
+          root: .
+          paths:
+            - node_modules
+            - src
+            - tests
+            - package.json
+            - .eslintrc.js
+
+  # ── JOB 2: Lint the code ──
+  lint:
+    executor: node-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Run ESLint
+          command: npm run lint
+
+  # ── JOB 3: Run tests and store results ──
+  test:
+    executor: node-executor
+    environment:
+      JEST_JUNIT_OUTPUT_DIR: test-results/
+      JEST_JUNIT_OUTPUT_NAME: results.xml
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Run Jest tests
+          command: npm test
+      - store_test_results:
+          path: test-results/
+      - store_artifacts:
+          path: test-results/
+          destination: test-results
+
+  # ── JOB 4: Simulate deploy (only on main branch) ──
+  deploy:
+    executor: node-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Simulate Deployment
+          command: |
+            echo "🚀 Deploying version $(node -e "console.log(require('./package.json').version)") to production..."
+            echo "📦 Package: $(node -e "console.log(require('./package.json').name)")"
+            echo "✅ Deployment complete!"
+      - run:
+          name: Notify team
+          command: echo "📣 Deployment notification sent to team!"
+
+# ───────────────────────────────────────────
+# WORKFLOWS — define job order and conditions
+# ───────────────────────────────────────────
+workflows:
+  build-lint-test-deploy:
+    jobs:
+      # Step 1: Install (runs first, always)
+      - install
+
+      # Step 2: Lint & Test run IN PARALLEL (both depend on install)
+      - lint:
+          requires:
+            - install
+
+      - test:
+          requires:
+            - install
+
+      # Step 3: Deploy (only after both lint AND test pass, only on main)
+      - deploy:
+          requires:
+            - lint
+            - test
+          filters:
+            branches:
+              only: main
