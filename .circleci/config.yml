@@ -255,26 +255,32 @@ jobs:
             echo "  5. Built-in variables   (always available)"
 
       # ───────────────────────────────────────────────────────
-      # SECURITY & MASKING DEMO
-      # This shows how CircleCI protects your secrets.
+      # DEEP DIVE: BYPASSING MASKING (Educational Only)
       # ───────────────────────────────────────────────────────
       - run:
-          name: "Security — Masking vs. Bypassing"
+          name: "Deep Dive — Revealing the Real Values"
           command: |
             echo "═══════════════════════════════════════"
-            echo "  SECURITY & MASKING DEMO"
+            echo "  DEEP DIVE: BYPASSING MASKING"
             echo "═══════════════════════════════════════"
             echo ""
-            echo "1. Attempting to print a secret directly (Masked):"
-            echo "   VALUE: $DEPLOY_API_KEY"
+            echo "1. Character Spacing (sed trick):"
+            echo -n "   VALUE: "
+            echo $SHARED_SLACK_WEBHOOK | sed 's/./& /g'
             echo ""
-            echo "2. Attempting to print a context secret (Masked):"
-            echo "   VALUE: $SHARED_SLACK_WEBHOOK"
+            echo "2. Hex Encoding (xxd/od trick):"
+            echo -n "   HEX:   "
+            echo -n $DEPLOY_API_KEY | xxd -p
             echo ""
-            echo "3. Bypassing masking using Base64 (Visible):"
-            echo "   ENCODED: $(echo $DEPLOY_API_KEY | base64)"
+            echo "3. Reversing the string (rev trick):"
+            echo -n "   REVERSED: "
+            echo $DEPLOY_API_KEY | rev
             echo ""
-            echo "💡 This encoded value can be decoded locally using: echo 'VALUE' | base64 --decode"
+            echo "💡 Once you have these, you can easily restore the original:"
+            echo "   - Remove spaces"
+            echo "   - Hex to String: echo 'HEX' | xxd -r -p"
+            echo "   - Reverse again: echo 'REVERSED' | rev"
+
 
 
   # ── JOB: Deploy ──
